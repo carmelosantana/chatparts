@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, cpSync, chmodSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, cpSync, chmodSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -222,5 +222,87 @@ test('sync refuses a target inside the chatparts checkout', () => {
     assert.ok(!existsSync(join(src, 'src', 'View', 'vendor-chatparts')));
   } finally {
     rmSync(src, { recursive: true, force: true });
+  }
+});
+
+// A PATH directory whose `mv` fails when one of its arguments matches the bash `pattern`,
+// and runs the real mv otherwise.
+function mvShim(pattern) {
+  const bin = tempDir('mv-shim-');
+  const realMv = spawnSync('bash', ['-c', 'command -v mv'], { encoding: 'utf8' }).stdout.trim();
+  writeFileSync(
+    join(bin, 'mv'),
+    `#!/usr/bin/env bash\nfor a in "$@"; do case "$a" in ${pattern}) echo "mv shim: refused $a" >&2; exit 1 ;; esac; done\nexec "${realMv}" "$@"\n`,
+  );
+  chmodSync(join(bin, 'mv'), 0o755);
+  return bin;
+}
+
+test('a failed move of the new copy into place restores the previous copy', () => {
+  const target = hostWithPreviousCopy();
+  const bin = mvShim('*/.vendor-chatparts.*'); // the verified stage
+  try {
+    const r = sh('sync-into.sh', [target], root, { PATH: `${bin}:${process.env.PATH}` });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /sync-into: .*restored/);
+    assertPreviousCopyIntact(target);
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+    rmSync(bin, { recursive: true, force: true });
+  }
+});
+
+test('a failed move of the previous copy aside leaves it in place', () => {
+  const target = hostWithPreviousCopy();
+  const bin = mvShim('*/.vendor-chatparts-old.*/old');
+  try {
+    const r = sh('sync-into.sh', [target], root, { PATH: `${bin}:${process.env.PATH}` });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /sync-into: /);
+    assertPreviousCopyIntact(target);
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+    rmSync(bin, { recursive: true, force: true });
+  }
+});
+
+test('sync refuses a destination that is the chatparts checkout or contains it', () => {
+  // The checkout itself named vendor-chatparts, with the target its parent.
+  const parent = tempDir('cp-parent-');
+  const src = join(parent, 'vendor-chatparts');
+  mkdirSync(src);
+  const copy = sourceCopy();
+  cpSync(copy, src, { recursive: true });
+  rmSync(copy, { recursive: true, force: true });
+  // Hosts whose vendor-chatparts is a symlink to the checkout, or to a directory above it.
+  const toRoot = tempDir('cp-link-');
+  const toAbove = tempDir('cp-link-');
+  symlinkSync(src, join(toRoot, 'vendor-chatparts'));
+  symlinkSync(parent, join(toAbove, 'vendor-chatparts'));
+  try {
+    for (const t of [parent, toRoot, toAbove]) {
+      const r = sh('sync-into.sh', [t], src);
+      assert.equal(r.status, 1, t);
+      assert.match(r.stderr, /sync-into: .*chatparts checkout/, t);
+    }
+    assert.ok(existsSync(join(src, 'scripts', 'sync-into.sh')), 'checkout untouched');
+    assert.deepEqual(readdirSync(parent), ['vendor-chatparts']);
+    assert.deepEqual(readdirSync(toRoot), ['vendor-chatparts']);
+    assert.deepEqual(readdirSync(toAbove), ['vendor-chatparts']);
+  } finally {
+    for (const d of [parent, toRoot, toAbove]) rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test('sync explains a staging dir it cannot make', { skip: process.getuid?.() === 0 && 'root ignores permissions' }, () => {
+  const target = tempDir('cp-sync-');
+  try {
+    chmodSync(target, 0o555);
+    const r = sh('sync-into.sh', [target]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /sync-into: .*staging/);
+  } finally {
+    chmodSync(target, 0o755);
+    rmSync(target, { recursive: true, force: true });
   }
 });

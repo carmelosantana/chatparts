@@ -120,6 +120,26 @@ test('dedupeAction: everything else drops the incoming copy', () => {
   assert.equal(dedupeAction(m('1', 'error', true), m('1', 'submitted')), 'drop');
 });
 
+// The asker's own post response carries the stream (sse-connect); a poll may deliver the same
+// draft first without one. The streaming copy must win, or the asker never sees the reply stream.
+const ms = (id, state, hasStream, failed = false) => ({ id, state, failed, hasStream });
+
+test('dedupeAction: a non-final copy with a stream replaces a non-final copy without one', () => {
+  for (const existing of [ms('1', 'submitted', false), ms('1', 'streaming', false)]) {
+    for (const incoming of [ms('1', 'submitted', true), ms('1', 'streaming', true)]) {
+      assert.equal(dedupeAction(existing, incoming), 'replace', `${existing.state} <- ${incoming.state}+stream`);
+    }
+  }
+});
+
+test('dedupeAction: a stream never displaces a stream, a final copy, or wins without one', () => {
+  assert.equal(dedupeAction(ms('1', 'streaming', true), ms('1', 'streaming', true)), 'drop', 'both stream: keep the first');
+  assert.equal(dedupeAction(ms('1', 'done', false), ms('1', 'streaming', true)), 'drop', 'final stays');
+  assert.equal(dedupeAction(ms('1', 'streaming', true), ms('1', 'streaming', false)), 'drop', 'the stream stays');
+  assert.equal(dedupeAction(ms('1', 'streaming', false), ms('1', 'streaming', false)), 'drop');
+  assert.equal(dedupeAction(ms('1', 'streaming', true), ms('1', 'done', false)), 'replace', 'final still wins');
+});
+
 test('hasOwnStreaming: true only for a streaming bubble whose id this composer posted', () => {
   const own = new Set(['20']);
   assert.equal(hasOwnStreaming(own, [m('20', 'streaming')]), true);

@@ -18,7 +18,7 @@ scripts/sync-into.sh /path/to/host-plugin
 This replaces `/path/to/host-plugin/vendor-chatparts/` with `src/`, `assets/`,
 `autoload.php`, `LICENSE`, `THIRD_PARTY.md` and `CHECKSUMS`. Files from an older copy are
 removed. The copy is staged and checked against `CHECKSUMS` first, and the script exits 1
-on a mismatch or an extra file. A failed sync leaves the previous copy as it was. It also refuses to run when `CHECKSUMS` does not match the
+on a mismatch or an extra file. A failed sync leaves the previous copy as it was (or puts it back). It also refuses a destination that is or holds the checkout, and refuses to run when `CHECKSUMS` does not match the
 source tree. After you change a vendored file, run `scripts/checksums.sh` and commit
 `CHECKSUMS`.
 
@@ -75,6 +75,9 @@ Components live in `ChatParts\View`, extend `Component` and take the host first.
 | `Notice` | `string $level` (`info`, `warning` or `error`), `string $text` |
 | `Drawer` | `string $title`, `string $subtitle`, `string $body` (ready HTML) |
 | `Icon` | `string $name`, `string $class = 'cp-icon'` |
+
+A `Notice` sent with status 400, 403, 409, 413, 422 or 429 is swapped into the request's
+target (htmx 2 swaps no 4xx response by default), and the composer keeps the typed text.
 
 `Hx::attrs()` builds `hx-*` and `sse-*` attributes from an allow-list. It is a static
 helper, not a component.

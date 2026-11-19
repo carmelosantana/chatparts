@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { rowsFor, shouldSubmit, nextAttachments, mentionQuery, format, isBlank } = require('../../assets/chatparts.js');
+const { rowsFor, shouldSubmit, nextAttachments, mentionQuery, format, isBlank, shouldSwapError } = require('../../assets/chatparts.js');
 
 const MB = 1024 * 1024;
 const img = (id, over = {}) => ({ id, name: `${id}.png`, size: 1000, type: 'image/png', ...over });
@@ -106,4 +106,21 @@ test('isBlank: a draft is sendable only with text; attachments alone do not coun
   assert.equal(isBlank(''), true);
   assert.equal(isBlank(' \n\t '), true);
   assert.equal(isBlank(' a '), false);
+});
+
+// htmx 2 does not swap 4xx responses; a kit Notice sent with one of these statuses is shown.
+const notice = '<div class="cp-notice cp-notice--error" role="alert"><p>Too long.</p></div>';
+
+test('shouldSwapError: a kit Notice with a client-error status is swapped', () => {
+  for (const status of [400, 403, 409, 413, 422, 429]) assert.equal(shouldSwapError(status, notice), true, String(status));
+  assert.equal(shouldSwapError(422, '<div class="cp-notice cp-notice--warning" role="status"></div>'), true);
+});
+
+test('shouldSwapError: other statuses or bodies without a Notice are left to htmx', () => {
+  for (const status of [200, 204, 302, 401, 404, 405, 500, 502, 503]) assert.equal(shouldSwapError(status, notice), false, String(status));
+  assert.equal(shouldSwapError(400, '<p>Bad request</p>'), false);
+  assert.equal(shouldSwapError(400, '<div class="x cp-notice">'), false, 'only a kit Notice (class starts with cp-notice)');
+  assert.equal(shouldSwapError(400, ''), false);
+  assert.equal(shouldSwapError(400, null), false);
+  assert.equal(shouldSwapError(400, undefined), false);
 });
