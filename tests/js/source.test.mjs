@@ -20,6 +20,11 @@ test('no eval, Function constructor, string timers or inline handlers', () => {
   assert.doesNotMatch(src, /document\.write/);
 });
 
+test('the textarea stays required: the script never changes it (text is mandatory, images or not)', () => {
+  assert.doesNotMatch(src, /\.required\s*=/);
+  assert.doesNotMatch(src, /(set|remove|toggle)Attribute\(\s*['"]required['"]/);
+});
+
 test('loads without a DOM and exports only functions', () => {
   const api = require(path.pathname);
   assert.ok(Object.keys(api).length > 0);

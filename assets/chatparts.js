@@ -143,6 +143,11 @@
     return head + '?' + pairs.join('&') + hash;
   }
 
+  /** Whether a draft has no text to send (attachments do not count). */
+  function isBlank(text) {
+    return String(text).trim() === '';
+  }
+
   /** `s` with its first `%s` replaced by `arg`, taken literally. */
   function format(s, arg) {
     return arg === undefined ? s : s.replace('%s', function () { return String(arg); });
@@ -160,6 +165,7 @@
     pollCursor: pollCursor,
     dedupeAction: dedupeAction,
     format: format,
+    isBlank: isBlank,
     hasOwnStreaming: hasOwnStreaming,
     setQueryParam: setQueryParam,
   };
@@ -336,12 +342,8 @@
 
   function updateEmpty(form) {
     var ta = textareaOf(form);
-    var s = attachments.get(form);
-    var images = !!(s && s.list.length);
-    var empty = (!ta || ta.value.trim() === '') && !images;
-    form.toggleAttribute('data-empty', empty);
-    // The textarea is `required` for the no-JS form; images alone are a message too.
-    if (ta) ta.required = !images;
+    // Text is mandatory (1–8000 characters after trim); images alone are not a message.
+    form.toggleAttribute('data-empty', !ta || isBlank(ta.value));
   }
 
   function isStopMode(form) {
