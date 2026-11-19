@@ -77,6 +77,6 @@ final class ContextMeter extends Component
         }
         $total = $this->tag('p', ['class' => 'cp-context__total'], $this->e($this->host->t('%s of %s tokens', number_format($used), number_format($this->window))));
 
-        return $ring . $this->tag('div', ['id' => 'cp-context-pop', 'hx-swap-oob' => 'innerHTML'], $rows . $total);
+        return $ring . $this->tag('div', ['id' => 'cp-context-pop'] + Hx::attrs(['swap-oob' => 'innerHTML']), $rows . $total);
     }
 }
