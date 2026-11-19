@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { rowsFor, shouldSubmit, nextAttachments, mentionQuery } = require('../../assets/chatparts.js');
+const { rowsFor, shouldSubmit, nextAttachments, mentionQuery, format } = require('../../assets/chatparts.js');
 
 const MB = 1024 * 1024;
 const img = (id, over = {}) => ({ id, name: `${id}.png`, size: 1000, type: 'image/png', ...over });
@@ -32,6 +32,7 @@ test('shouldSubmit: plain Enter on an enabled box sends', () => {
 
 test('shouldSubmit: not while composing (IME), with Shift, when disabled, or for other keys', () => {
   assert.equal(shouldSubmit(enter({ isComposing: true }), false), false);
+  assert.equal(shouldSubmit(enter({ keyCode: 229 }), false), false, 'Safari IME confirm');
   assert.equal(shouldSubmit(enter({ shiftKey: true }), false), false);
   assert.equal(shouldSubmit(enter(), true), false);
   assert.equal(shouldSubmit(enter({ key: 'a' }), false), false);
@@ -93,4 +94,10 @@ test('mentionQuery: nothing for an email, a finished mention or a caret elsewher
 
 test('mentionQuery: reads only up to the caret', () => {
   assert.deepEqual(mentionQuery('@bot hello', 2), { start: 0, query: 'b' });
+});
+
+test('format: %s takes the argument literally ($ patterns are not special)', () => {
+  assert.equal(format('Remove %s', "$'x.png"), "Remove $'x.png");
+  assert.equal(format('%s answered', '$&bot'), '$&bot answered');
+  assert.equal(format('No placeholder', 'x'), 'No placeholder');
 });

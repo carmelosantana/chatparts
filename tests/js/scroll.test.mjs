@@ -66,48 +66,65 @@ test('setQueryParam: encodes the value', () => {
   assert.equal(setQueryParam('/p', 'q', 'a b&c'), '/p?q=a%20b%26c');
 });
 
-// ---- Pre-review fixes: cursor skips unfinished bubbles, dedupe prefers the finished copy,
-// and only this composer's own streaming reply turns its Send into Stop.
-const { cursorIds, dedupeAction, hasOwnStreaming } = require('../../assets/chatparts.js');
+// ---- Poll cursor, dedupe and Send/Stop scope. "Final" is what the server rendered as done,
+// stopped or error; a draft the client itself marked failed (after an SSE error) is not final.
+const { pollCursor, dedupeAction, hasOwnStreaming, isFinal } = require('../../assets/chatparts.js');
 
-test('cursorIds: only finished bubbles (done, stopped) move the cursor', () => {
-  const list = [
-    { id: '10', state: 'done' },
-    { id: '11', state: 'stopped' },
-    { id: '12', state: 'submitted' },
-    { id: '13', state: 'streaming' },
-    { id: '14', state: 'error' },
-  ];
-  assert.deepEqual(cursorIds(list), ['10', '11']);
-  assert.equal(maxMessageId(cursorIds(list)), 11);
+const m = (id, state, failed = false) => ({ id, state, failed });
+
+test('isFinal: server done, stopped and error are final; a client-failed draft is not', () => {
+  assert.equal(isFinal(m('1', 'done')), true);
+  assert.equal(isFinal(m('1', 'stopped')), true);
+  assert.equal(isFinal(m('1', 'error')), true);
+  assert.equal(isFinal(m('1', 'error', true)), false);
+  for (const state of ['submitted', 'streaming', 'weird', null]) assert.equal(isFinal(m('1', state)), false, String(state));
 });
 
-test('cursorIds: an unknown or missing state does not count as finished', () => {
-  assert.deepEqual(cursorIds([{ id: '1', state: 'weird' }, { id: '2', state: null }, { id: '3', state: 'done' }]), ['3']);
+test('pollCursor: all final, the largest id', () => {
+  assert.equal(pollCursor([m('10', 'done'), m('12', 'error'), m('11', 'stopped')]), 12);
 });
 
-test('dedupeAction: a finished copy replaces an unfinished one', () => {
-  for (const existing of ['submitted', 'streaming', 'error']) {
-    for (const incoming of ['done', 'stopped']) {
-      assert.equal(dedupeAction(existing, incoming), 'replace', `${existing} <- ${incoming}`);
+test('pollCursor: never past the oldest unfinished bubble, even when a newer one is final', () => {
+  assert.equal(pollCursor([m('40', 'done'), m('41', 'streaming'), m('42', 'done')]), 40);
+  assert.equal(pollCursor([m('40', 'done'), m('41', 'error', true), m('42', 'done')]), 40, 'client-failed draft');
+  assert.equal(pollCursor([m('39', 'submitted'), m('41', 'streaming'), m('42', 'done')]), 38);
+});
+
+test('pollCursor: unfinished ids above the largest final keep the final id', () => {
+  assert.equal(pollCursor([m('40', 'done'), m('45', 'streaming')]), 40);
+});
+
+test('pollCursor: only unfinished bubbles, one below the oldest', () => {
+  assert.equal(pollCursor([m('41', 'streaming')]), 40);
+});
+
+test('pollCursor: null with no numeric ids (keep the server-rendered value)', () => {
+  assert.equal(pollCursor([]), null);
+  assert.equal(pollCursor([m('m1', 'done'), m('draft', 'streaming')]), null);
+});
+
+test('dedupeAction: a final copy replaces a non-final one', () => {
+  for (const existing of [m('1', 'submitted'), m('1', 'streaming'), m('1', 'error', true)]) {
+    for (const incoming of [m('1', 'done'), m('1', 'stopped'), m('1', 'error')]) {
+      assert.equal(dedupeAction(existing, incoming), 'replace', `${existing.state}/${existing.failed} <- ${incoming.state}`);
     }
   }
 });
 
 test('dedupeAction: everything else drops the incoming copy', () => {
-  assert.equal(dedupeAction('done', 'done'), 'drop');
-  assert.equal(dedupeAction('done', 'streaming'), 'drop');
-  assert.equal(dedupeAction('stopped', 'done'), 'drop');
-  assert.equal(dedupeAction('streaming', 'streaming'), 'drop');
-  assert.equal(dedupeAction('streaming', 'error'), 'drop');
-  assert.equal(dedupeAction('error', 'submitted'), 'drop');
+  assert.equal(dedupeAction(m('1', 'done'), m('1', 'done')), 'drop');
+  assert.equal(dedupeAction(m('1', 'error'), m('1', 'done')), 'drop', 'a stored error is final');
+  assert.equal(dedupeAction(m('1', 'done'), m('1', 'streaming')), 'drop');
+  assert.equal(dedupeAction(m('1', 'streaming'), m('1', 'streaming')), 'drop');
+  assert.equal(dedupeAction(m('1', 'streaming'), m('1', 'error', true)), 'drop');
+  assert.equal(dedupeAction(m('1', 'error', true), m('1', 'submitted')), 'drop');
 });
 
 test('hasOwnStreaming: true only for a streaming bubble whose id this composer posted', () => {
   const own = new Set(['20']);
-  assert.equal(hasOwnStreaming(own, [{ id: '20', state: 'streaming' }]), true);
-  assert.equal(hasOwnStreaming(own, [{ id: '21', state: 'streaming' }]), false, "someone else's bot reply");
-  assert.equal(hasOwnStreaming(own, [{ id: '20', state: 'done' }]), false, 'finished');
-  assert.equal(hasOwnStreaming(new Set(), [{ id: '20', state: 'streaming' }]), false);
-  assert.equal(hasOwnStreaming(undefined, [{ id: '20', state: 'streaming' }]), false);
+  assert.equal(hasOwnStreaming(own, [m('20', 'streaming')]), true);
+  assert.equal(hasOwnStreaming(own, [m('21', 'streaming')]), false, "someone else's bot reply");
+  assert.equal(hasOwnStreaming(own, [m('20', 'done')]), false, 'finished');
+  assert.equal(hasOwnStreaming(new Set(), [m('20', 'streaming')]), false);
+  assert.equal(hasOwnStreaming(undefined, [m('20', 'streaming')]), false);
 });

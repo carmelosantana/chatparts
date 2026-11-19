@@ -15,6 +15,9 @@ test('no eval, Function constructor, string timers or inline handlers', () => {
   assert.doesNotMatch(src, /set(Timeout|Interval)\s*\(\s*['"`]/);
   assert.doesNotMatch(src, /setAttribute\(\s*['"]on[a-z]+['"]/i);
   assert.doesNotMatch(src, /\.innerHTML\s*=/);
+  assert.doesNotMatch(src, /\.outerHTML\s*=/);
+  assert.doesNotMatch(src, /insertAdjacentHTML/);
+  assert.doesNotMatch(src, /document\.write/);
 });
 
 test('loads without a DOM and exports only functions', () => {

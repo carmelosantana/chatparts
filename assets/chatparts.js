@@ -86,22 +86,34 @@
     return typeof existing.has === 'function' ? existing.has(id) : existing.indexOf(id) >= 0;
   }
 
-  /** A message state that will not change again: `done` or `stopped`. */
-  function isFinal(state) {
-    return state === 'done' || state === 'stopped';
+  /**
+   * Whether a bubble {state, failed} will not change again: the server rendered it done, stopped
+   * or error. A draft the client marked failed itself (after a stream error) is not final: the
+   * stored copy, whatever it says, is still to come.
+   */
+  function isFinal(m) {
+    return !m.failed && (m.state === 'done' || m.state === 'stopped' || m.state === 'error');
   }
 
   /**
-   * The ids that may move the poll cursor, from [{id, state}]: finished messages only, so an
-   * unfinished one (submitted, streaming, error) is fetched again until its final copy arrives.
+   * The poll's `after` value from the bubbles shown, [{id, state, failed}]: the largest final id,
+   * but never past the oldest unfinished one (so its stored copy is fetched again). Null when no
+   * bubble has a numeric id, meaning keep the server-rendered value.
    */
-  function cursorIds(list) {
-    return list.filter(function (m) { return isFinal(m.state); }).map(function (m) { return m.id; });
+  function pollCursor(list) {
+    var maxFinal = maxMessageId(list.filter(isFinal).map(function (m) { return m.id; }));
+    var minOpen = null;
+    list.forEach(function (m) {
+      var n = maxMessageId([m.id]);
+      if (n !== null && !isFinal(m) && (minOpen === null || n < minOpen)) minOpen = n;
+    });
+    if (minOpen === null) return maxFinal;
+    return maxFinal === null ? minOpen - 1 : Math.min(maxFinal, minOpen - 1);
   }
 
-  /** For a bubble whose id is already shown: 'replace' when only the newcomer is finished, else 'drop'. */
-  function dedupeAction(existingState, incomingState) {
-    return !isFinal(existingState) && isFinal(incomingState) ? 'replace' : 'drop';
+  /** For a bubble {state, failed} whose id is already shown: 'replace' when only the newcomer is final, else 'drop'. */
+  function dedupeAction(existing, incoming) {
+    return !isFinal(existing) && isFinal(incoming) ? 'replace' : 'drop';
   }
 
   /** Whether any streaming message in [{id, state}] is one this composer posted (`ownIds`, a Set). */
@@ -131,6 +143,11 @@
     return head + '?' + pairs.join('&') + hash;
   }
 
+  /** `s` with its first `%s` replaced by `arg`, taken literally. */
+  function format(s, arg) {
+    return arg === undefined ? s : s.replace('%s', function () { return String(arg); });
+  }
+
   var api = {
     rowsFor: rowsFor,
     shouldSubmit: shouldSubmit,
@@ -139,8 +156,10 @@
     mentionQuery: mentionQuery,
     maxMessageId: maxMessageId,
     isDuplicate: isDuplicate,
-    cursorIds: cursorIds,
+    isFinal: isFinal,
+    pollCursor: pollCursor,
     dedupeAction: dedupeAction,
+    format: format,
     hasOwnStreaming: hasOwnStreaming,
     setQueryParam: setQueryParam,
   };
@@ -160,8 +179,7 @@
   })();
 
   function t(s, arg) {
-    var out = typeof STR[s] === 'string' ? STR[s] : s;
-    return arg === undefined ? out : out.replace('%s', arg);
+    return format(typeof STR[s] === 'string' ? STR[s] : s, arg);
   }
 
   var ERRORS = {
@@ -177,7 +195,7 @@
   /** The bubbles under `root` that carry an id, as [{id, state, el}] in document order. */
   function messagesIn(root) {
     return Array.prototype.map.call(root.querySelectorAll('.cp-msg[data-id]'), function (el) {
-      return { id: el.getAttribute('data-id'), state: el.getAttribute('data-state'), el: el };
+      return { id: el.getAttribute('data-id'), state: el.getAttribute('data-state'), failed: el.hasAttribute('data-cp-failed'), el: el };
     });
   }
   function eltOf(e) { return (e.detail && e.detail.elt) || e.target; }
@@ -319,8 +337,11 @@
   function updateEmpty(form) {
     var ta = textareaOf(form);
     var s = attachments.get(form);
-    var empty = (!ta || ta.value.trim() === '') && !(s && s.list.length);
+    var images = !!(s && s.list.length);
+    var empty = (!ta || ta.value.trim() === '') && !images;
     form.toggleAttribute('data-empty', empty);
+    // The textarea is `required` for the no-JS form; images alone are a message too.
+    if (ta) ta.required = !images;
   }
 
   function isStopMode(form) {
@@ -363,8 +384,11 @@
     btn.setAttribute('data-state', 'stopping');
     var body = new FormData();
     form.querySelectorAll('input[type="hidden"][name]').forEach(function (input) { body.append(input.name, input.value); });
+    var revert = function () {
+      if (btn.getAttribute('data-state') === 'stopping') btn.setAttribute('data-state', 'streaming');
+    };
     window.fetch(url, { method: 'POST', body: body, credentials: 'same-origin', headers: { 'HX-Request': 'true' } })
-      .catch(function () { btn.setAttribute('data-state', 'streaming'); });
+      .then(function (res) { if (!res.ok) revert(); }, revert);
   }
 
   function resetComposer(form) {
@@ -447,7 +471,7 @@
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       var step = e.key === 'ArrowDown' ? 1 : -1;
       setActive(p, items[(cur + step + items.length) % items.length]);
-    } else if ((e.key === 'Enter' && !e.isComposing) || e.key === 'Tab') {
+    } else if ((e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) || e.key === 'Tab') {
       pickMention(items[cur] || items[0]);
     } else if (e.key === 'Escape') {
       closeMention();
@@ -501,16 +525,32 @@
         return;
       }
       var prev = shown.get(m.id);
-      if (dedupeAction(prev.state, m.state) === 'replace') {
-        prev.el.replaceWith(m.el);
+      if (dedupeAction(prev, m) === 'replace') {
+        prev.el.parentNode.insertBefore(m.el, prev.el);
+        discard(prev.el);
         shown.set(m.id, m);
       } else {
-        m.el.remove();
+        discard(m.el);
       }
     });
   }
 
   // ---- Streams --------------------------------------------------------------------------
+
+  /**
+   * Remove a bubble and close any stream inside it. htmx-ext-sse closes its EventSource on
+   * htmx:beforeCleanupElement, which a plain remove() never sends; htmx.trigger reaches the
+   * extension, and dropping sse-connect stops its retry timer.
+   */
+  function discard(el) {
+    var streams = Array.prototype.slice.call(el.querySelectorAll('[sse-connect], [data-sse-connect]'));
+    if (matches(el, '[sse-connect], [data-sse-connect]')) streams.push(el);
+    streams.forEach(function (node) {
+      if (window.htmx && typeof window.htmx.trigger === 'function') window.htmx.trigger(node, 'htmx:beforeCleanupElement');
+      forgetStream(node);
+    });
+    el.remove();
+  }
 
   function forgetStream(el) {
     if (!el || !el.removeAttribute) return;
@@ -525,6 +565,7 @@
     if (matches(el, '.cp-msg[data-state="streaming"]')) drafts.push(el);
     drafts.forEach(function (msg) {
       msg.setAttribute('data-state', 'error');
+      msg.setAttribute('data-cp-failed', '');
       msg.removeAttribute('aria-busy');
       msg.querySelectorAll('.cp-caret').forEach(function (c) { c.classList.remove('cp-caret'); });
     });
@@ -744,7 +785,7 @@
     var el = eltOf(e);
     var d = e.detail;
     if (matches(el, '[data-cp-poll]')) {
-      var after = maxMessageId(cursorIds(messagesIn(el)));
+      var after = pollCursor(messagesIn(el));
       if (after !== null) d.path = setQueryParam(d.path, 'after', after);
     } else if (matches(el, '.cp-ctl--context')) {
       var form = el.closest('form');
