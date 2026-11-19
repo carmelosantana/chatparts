@@ -28,6 +28,13 @@ final class ComposerTest extends TestCase
         $this->assertStringContainsString('<div id="cp-context-pop" class="cp-context__pop" hidden=""></div>', $html);
     }
 
+    public function testTextareaIsCappedAndRequired(): void
+    {
+        $html = (new Composer(new FakeHost(), '/send', self::OPTS))->render();
+
+        $this->assertMatchesRegularExpression('/<textarea id="cp-message" class="cp-box__input" name="message" rows="1" maxlength="8000" required="" placeholder="[^"]*"><\/textarea>/', $html);
+    }
+
     public function testNoAtBotHintWhenCannotAsk(): void
     {
         $this->assertStringContainsString('@bot', (new Composer(new FakeHost(), '/send', self::OPTS))->render());

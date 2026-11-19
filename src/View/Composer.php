@@ -18,6 +18,9 @@ final class Composer extends Component
 {
     private const IMAGE_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 
+    /** A hint for the browser; the server's own limit is what counts. */
+    private const MAX_LENGTH = 8000;
+
     /**
      * @param array{placeholder?: string, room?: string, allowImages?: bool, canAsk?: bool, contextUrl?: string, stopUrl?: string} $opts
      *   `room` is posted as a hidden field; `canAsk` adds the @bot hint to the default
@@ -41,7 +44,7 @@ final class Composer extends Component
 
         $box = ($images ? $this->tag('div', ['id' => 'cp-thumbs', 'class' => 'cp-thumbs']) : '')
             . $this->tag('label', ['class' => 'cp-sr', 'for' => 'cp-message'], $this->e($this->host->t('Message')))
-            . $this->tag('textarea', ['id' => 'cp-message', 'class' => 'cp-box__input', 'name' => 'message', 'rows' => '1', 'placeholder' => $this->placeholder()])
+            . $this->tag('textarea', ['id' => 'cp-message', 'class' => 'cp-box__input', 'name' => 'message', 'rows' => '1', 'maxlength' => (string) self::MAX_LENGTH, 'required' => '', 'placeholder' => $this->placeholder()])
             . ($images ? $this->tag('input', ['type' => 'file', 'id' => 'cp-images', 'name' => 'images[]', 'accept' => self::IMAGE_TYPES, 'multiple' => '', 'hidden' => '']) : '');
 
         $attach = $images ? $this->tag(
