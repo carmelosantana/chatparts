@@ -51,7 +51,7 @@ final class MessageBubbleTest extends TestCase
     {
         $html = (new MessageBubble(new FakeHost(), $this->message('bot', MessageStatus::Done, [new TextPart('t1', 'hi')])))->render();
 
-        $this->assertStringStartsWith('<article id="cp-msg-m1" class="cp-msg cp-msg--bot" data-state="done">', $html);
+        $this->assertStringStartsWith('<article id="cp-msg-m1" class="cp-msg cp-msg--bot" data-id="m1" data-state="done">', $html);
         $this->assertStringContainsString('<span class="cp-avatar cp-avatar--bot" aria-hidden="true"><svg class="cp-icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#bot"/></svg></span>', $html);
         $this->assertStringContainsString('<span class="cp-badge cp-badge--bot">Bot</span>', $html);
         $this->assertStringContainsString('project-bot', $html);
@@ -72,7 +72,7 @@ final class MessageBubbleTest extends TestCase
     {
         $html = (new MessageBubble(new FakeHost(), $this->message('bot', MessageStatus::Streaming, [new TextPart('t1', 'par<tial')]), true))->render();
 
-        $this->assertStringStartsWith('<article id="cp-msg-m1" class="cp-msg cp-msg--bot" data-state="streaming" aria-busy="true">', $html);
+        $this->assertStringStartsWith('<article id="cp-msg-m1" class="cp-msg cp-msg--bot" data-id="m1" data-state="streaming" aria-busy="true">', $html);
         $this->assertStringContainsString('<div id="cp-text-t1" class="cp-response cp-caret">par&lt;tial</div>', $html);
     }
 

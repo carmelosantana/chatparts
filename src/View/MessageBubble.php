@@ -51,7 +51,7 @@ final class MessageBubble extends Component
 
         return $this->tag(
             'article',
-            ['id' => 'cp-msg-' . $this->m->id, 'class' => 'cp-msg cp-msg--' . $kind, 'data-state' => $this->m->status->value, 'aria-busy' => $this->streaming ? 'true' : null],
+            ['id' => 'cp-msg-' . $this->m->id, 'class' => 'cp-msg cp-msg--' . $kind, 'data-id' => $this->m->id, 'data-state' => $this->m->status->value, 'aria-busy' => $this->streaming ? 'true' : null],
             new Avatar($this->host, $this->m->participant) . $this->tag('div', ['class' => 'cp-msg__body'], $body),
         );
     }
