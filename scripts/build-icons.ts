@@ -27,8 +27,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export type Lock = { lucide: string; icons: Record<string, string> };
-export type FetchText = (url: string) => Promise<string>;
-export type RunOptions = { lockPath: string; spritePath: string; update: boolean; fetchText?: FetchText };
+export type FetchBytes = (url: string) => Promise<Uint8Array>;
+export type RunOptions = { lockPath: string; spritePath: string; update: boolean; fetchBytes?: FetchBytes };
 
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const TAG = /^\d+\.\d+\.\d+$/;
@@ -73,8 +73,9 @@ export function iconUrl(tag: string, name: string): string {
   return `https://raw.githubusercontent.com/lucide-icons/lucide/${tag}/icons/${name}.svg`;
 }
 
-export function sha256(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
+/** Over the raw response bytes, so the lock pins exactly what GitHub served. */
+export function sha256(bytes: Uint8Array): string {
+  return createHash('sha256').update(bytes).digest('hex');
 }
 
 /** The icon's shapes, re-serialised from parsed geometry only; throws on anything else. */
@@ -84,7 +85,7 @@ export function sanitize(name: string, svg: string): string {
   };
   const root = ROOT_RE.exec(svg) ?? fail('not a single Lucide <svg> root');
   for (const [k, v] of parseAttrs(root[1], fail)) {
-    if (ROOT[k] !== v) fail(`unexpected root attribute ${k}="${v}"`);
+    if (!Object.hasOwn(ROOT, k) || ROOT[k] !== v) fail(`unexpected root attribute ${k}="${v}"`);
   }
 
   const shapes: string[] = [];
@@ -92,7 +93,7 @@ export function sanitize(name: string, svg: string): string {
   while (body.trim() !== '') {
     const el = ELEMENT_RE.exec(body) ?? fail(`unexpected content ${JSON.stringify(body.trim().slice(0, 40))}`);
     const tag = el[1];
-    const allowed = GEOMETRY[tag] ?? fail(`element <${tag}> is not allowed`);
+    const allowed = (Object.hasOwn(GEOMETRY, tag) ? GEOMETRY[tag] : undefined) ?? fail(`element <${tag}> is not allowed`);
     let out = `<${tag}`;
     for (const [k, v] of parseAttrs(el[2], fail)) {
       if (!allowed.includes(k)) fail(`attribute ${k} is not allowed on <${tag}>`);
@@ -131,14 +132,14 @@ function readLock(path: string, update: boolean): Lock {
   return lock;
 }
 
-async function fetchFromGitHub(url: string): Promise<string> {
+async function fetchFromGitHub(url: string): Promise<Uint8Array> {
   const u = new URL(url);
   if (u.protocol !== 'https:' || u.hostname !== 'raw.githubusercontent.com') throw new Error(`refusing to fetch ${url}`);
   const res = await fetch(u, { redirect: 'error' });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   const bytes = await res.arrayBuffer();
   if (bytes.byteLength > MAX_BYTES) throw new Error(`${url} is larger than ${MAX_BYTES} bytes`);
-  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  return new Uint8Array(bytes);
 }
 
 function writeAtomic(path: string, text: string): void {
@@ -147,14 +148,15 @@ function writeAtomic(path: string, text: string): void {
 }
 
 /** Fetches, checks and sanitises every icon first; writes only when all of them pass. */
-export async function run({ lockPath, spritePath, update, fetchText = fetchFromGitHub }: RunOptions): Promise<number> {
+export async function run({ lockPath, spritePath, update, fetchBytes = fetchFromGitHub }: RunOptions): Promise<number> {
   const lock = readLock(lockPath, update);
   const sums: Record<string, string> = {};
   const symbols: string[] = [];
   for (const [name, pinned] of Object.entries(lock.icons)) {
-    const text = await fetchText(iconUrl(lock.lucide, name));
-    const sum = sha256(text);
+    const bytes = await fetchBytes(iconUrl(lock.lucide, name));
+    const sum = sha256(bytes);
     if (!update && sum !== pinned) throw new Error(`checksum mismatch for ${name}: lock has ${pinned}, fetched ${sum}`);
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     symbols.push(`<symbol id="${name}" ${SYMBOL_ATTRS}>${sanitize(name, text)}</symbol>`);
     sums[name] = sum;
   }

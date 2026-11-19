@@ -23,13 +23,13 @@ function setup(icons) {
   const spritePath = join(dir, 'icons.svg');
   writeFileSync(lockPath, JSON.stringify({ lucide: '1.0.0', icons }, null, 2) + '\n');
   const fetched = [];
-  const fetchText = async (url) => {
+  const fetchBytes = async (url) => {
     fetched.push(url);
     const name = url.split('/').pop().replace(/\.svg$/, '');
     if (!(name in files)) throw new Error(`404 ${url}`);
-    return files[name];
+    return new TextEncoder().encode(files[name]);
   };
-  return { dir, lockPath, spritePath, fetchText, fetched, done: () => rmSync(dir, { recursive: true }) };
+  return { dir, lockPath, spritePath, fetchBytes, fetched, done: () => rmSync(dir, { recursive: true }) };
 }
 
 test('checksum mismatch aborts', async () => {
@@ -64,6 +64,15 @@ test('--update writes checksums, then a normal run verifies them', async () => {
   t.done();
 });
 
+test('checksums cover the raw response bytes, not the decoded text', async () => {
+  const t = setup({ check: '' });
+  const bom = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(files.check)]);
+  writeFileSync(t.lockPath, JSON.stringify({ lucide: '1.0.0', icons: { check: sha(bom) } }));
+  await run({ ...t, fetchBytes: async () => bom, update: false });
+  assert.match(readFileSync(t.spritePath, 'utf8'), /<symbol id="check"/);
+  t.done();
+});
+
 test('icon URLs are raw GitHub files at the pinned tag', () => {
   assert.equal(iconUrl('1.74.0', 'bot'), 'https://raw.githubusercontent.com/lucide-icons/lucide/1.74.0/icons/bot.svg');
   assert.throws(() => iconUrl('1.74.0', '../x'), /icon name/);
@@ -88,8 +97,10 @@ for (const [label, bad] of [
   ['outer svg handler', svg('  <path d="M0 0" />').replace('<svg', '<svg onload="x"')],
   ['comment', svg('  <!-- hi --><path d="M0 0" />')],
   ['no svg root', '<path d="M0 0" />'],
+  ['prototype-named element', svg('  <constructor />')],
+  ['prototype-named root attribute', svg('  <path d="M0 0" />').replace('<svg', '<svg constructor="x"')],
 ]) {
   test(`sanitize rejects ${label}`, () => {
-    assert.throws(() => sanitize('x', bad), /icon x/);
+    assert.throws(() => sanitize('x', bad), (e) => e instanceof Error && !(e instanceof TypeError) && /^icon x: /.test(e.message));
   });
 }
