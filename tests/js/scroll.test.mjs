@@ -65,3 +65,49 @@ test('setQueryParam: does not touch a key that merely ends with the name', () =>
 test('setQueryParam: encodes the value', () => {
   assert.equal(setQueryParam('/p', 'q', 'a b&c'), '/p?q=a%20b%26c');
 });
+
+// ---- Pre-review fixes: cursor skips unfinished bubbles, dedupe prefers the finished copy,
+// and only this composer's own streaming reply turns its Send into Stop.
+const { cursorIds, dedupeAction, hasOwnStreaming } = require('../../assets/chatparts.js');
+
+test('cursorIds: only finished bubbles (done, stopped) move the cursor', () => {
+  const list = [
+    { id: '10', state: 'done' },
+    { id: '11', state: 'stopped' },
+    { id: '12', state: 'submitted' },
+    { id: '13', state: 'streaming' },
+    { id: '14', state: 'error' },
+  ];
+  assert.deepEqual(cursorIds(list), ['10', '11']);
+  assert.equal(maxMessageId(cursorIds(list)), 11);
+});
+
+test('cursorIds: an unknown or missing state does not count as finished', () => {
+  assert.deepEqual(cursorIds([{ id: '1', state: 'weird' }, { id: '2', state: null }, { id: '3', state: 'done' }]), ['3']);
+});
+
+test('dedupeAction: a finished copy replaces an unfinished one', () => {
+  for (const existing of ['submitted', 'streaming', 'error']) {
+    for (const incoming of ['done', 'stopped']) {
+      assert.equal(dedupeAction(existing, incoming), 'replace', `${existing} <- ${incoming}`);
+    }
+  }
+});
+
+test('dedupeAction: everything else drops the incoming copy', () => {
+  assert.equal(dedupeAction('done', 'done'), 'drop');
+  assert.equal(dedupeAction('done', 'streaming'), 'drop');
+  assert.equal(dedupeAction('stopped', 'done'), 'drop');
+  assert.equal(dedupeAction('streaming', 'streaming'), 'drop');
+  assert.equal(dedupeAction('streaming', 'error'), 'drop');
+  assert.equal(dedupeAction('error', 'submitted'), 'drop');
+});
+
+test('hasOwnStreaming: true only for a streaming bubble whose id this composer posted', () => {
+  const own = new Set(['20']);
+  assert.equal(hasOwnStreaming(own, [{ id: '20', state: 'streaming' }]), true);
+  assert.equal(hasOwnStreaming(own, [{ id: '21', state: 'streaming' }]), false, "someone else's bot reply");
+  assert.equal(hasOwnStreaming(own, [{ id: '20', state: 'done' }]), false, 'finished');
+  assert.equal(hasOwnStreaming(new Set(), [{ id: '20', state: 'streaming' }]), false);
+  assert.equal(hasOwnStreaming(undefined, [{ id: '20', state: 'streaming' }]), false);
+});

@@ -86,6 +86,30 @@
     return typeof existing.has === 'function' ? existing.has(id) : existing.indexOf(id) >= 0;
   }
 
+  /** A message state that will not change again: `done` or `stopped`. */
+  function isFinal(state) {
+    return state === 'done' || state === 'stopped';
+  }
+
+  /**
+   * The ids that may move the poll cursor, from [{id, state}]: finished messages only, so an
+   * unfinished one (submitted, streaming, error) is fetched again until its final copy arrives.
+   */
+  function cursorIds(list) {
+    return list.filter(function (m) { return isFinal(m.state); }).map(function (m) { return m.id; });
+  }
+
+  /** For a bubble whose id is already shown: 'replace' when only the newcomer is finished, else 'drop'. */
+  function dedupeAction(existingState, incomingState) {
+    return !isFinal(existingState) && isFinal(incomingState) ? 'replace' : 'drop';
+  }
+
+  /** Whether any streaming message in [{id, state}] is one this composer posted (`ownIds`, a Set). */
+  function hasOwnStreaming(ownIds, list) {
+    if (!ownIds) return false;
+    return list.some(function (m) { return m.state === 'streaming' && ownIds.has(m.id); });
+  }
+
   /** `path` with query parameter `key` set to `value` (replaced if present, else appended). */
   function setQueryParam(path, key, value) {
     var hashAt = path.indexOf('#');
@@ -115,6 +139,9 @@
     mentionQuery: mentionQuery,
     maxMessageId: maxMessageId,
     isDuplicate: isDuplicate,
+    cursorIds: cursorIds,
+    dedupeAction: dedupeAction,
+    hasOwnStreaming: hasOwnStreaming,
     setQueryParam: setQueryParam,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -146,6 +173,13 @@
   // ---- Small DOM helpers ----------------------------------------------------------------
 
   function conversation() { return document.getElementById('cp-conversation'); }
+
+  /** The bubbles under `root` that carry an id, as [{id, state, el}] in document order. */
+  function messagesIn(root) {
+    return Array.prototype.map.call(root.querySelectorAll('.cp-msg[data-id]'), function (el) {
+      return { id: el.getAttribute('data-id'), state: el.getAttribute('data-state'), el: el };
+    });
+  }
   function eltOf(e) { return (e.detail && e.detail.elt) || e.target; }
   function matches(el, sel) { return !!(el && el.nodeType === 1 && el.matches(sel)); }
 
@@ -294,10 +328,26 @@
     return !!btn && btn.getAttribute('data-state') !== 'ready';
   }
 
-  /** Send becomes Stop while any bubble streams (only where the host gave a stop URL). */
+  /** Message ids each composer got back from its own posts: form -> Set of ids. */
+  var ownIds = new WeakMap();
+
+  /** Remember the bubbles in a composer's post response as that composer's own. */
+  function recordOwn(form, html) {
+    if (typeof DOMParser === 'undefined' || typeof html !== 'string' || html === '') return;
+    var doc = new DOMParser().parseFromString(html, 'text/html'); // inert: scripts never run
+    var ids = ownIds.get(form) || new Set();
+    messagesIn(doc).forEach(function (m) { if (m.id) ids.add(m.id); });
+    ownIds.set(form, ids);
+  }
+
+  /**
+   * Send becomes Stop while a reply this composer asked for is streaming (only where the host
+   * gave a stop URL); someone else's streaming reply leaves it alone.
+   */
   function syncSend() {
-    var streaming = !!document.querySelector('.cp-msg[data-state="streaming"]');
+    var list = messagesIn(document);
     document.querySelectorAll('.cp-send[data-stop-url]').forEach(function (btn) {
+      var streaming = hasOwnStreaming(btn.form && ownIds.get(btn.form), list);
       var cur = btn.getAttribute('data-state');
       var next = streaming ? (cur === 'stopping' ? 'stopping' : 'streaming') : 'ready';
       if (cur === next) return;
@@ -437,13 +487,26 @@
     scroll.height = conv.scrollHeight;
   }
 
-  /** Keep the first bubble of each data-id; a later copy (send response vs poll) is dropped. */
+  /**
+   * One bubble per data-id (a message can come by the send response, the poll and the stream):
+   * a later copy replaces the shown one in place when only the later copy is finished, and is
+   * dropped otherwise.
+   */
   function dedupe(conv) {
-    var seen = new Set();
-    conv.querySelectorAll('.cp-msg[data-id]').forEach(function (msg) {
-      var id = msg.getAttribute('data-id');
-      if (isDuplicate(id, seen)) msg.remove();
-      else seen.add(id);
+    var shown = new Map();
+    messagesIn(conv).forEach(function (m) {
+      if (!m.id) return;
+      if (!isDuplicate(m.id, shown)) {
+        shown.set(m.id, m);
+        return;
+      }
+      var prev = shown.get(m.id);
+      if (dedupeAction(prev.state, m.state) === 'replace') {
+        prev.el.replaceWith(m.el);
+        shown.set(m.id, m);
+      } else {
+        m.el.remove();
+      }
     });
   }
 
@@ -681,8 +744,7 @@
     var el = eltOf(e);
     var d = e.detail;
     if (matches(el, '[data-cp-poll]')) {
-      var ids = Array.prototype.map.call(el.querySelectorAll('.cp-msg[data-id]'), function (m) { return m.getAttribute('data-id'); });
-      var after = maxMessageId(ids);
+      var after = maxMessageId(cursorIds(messagesIn(el)));
       if (after !== null) d.path = setQueryParam(d.path, 'after', after);
     } else if (matches(el, '.cp-ctl--context')) {
       var form = el.closest('form');
@@ -712,7 +774,12 @@
     syncSend();
     afterChange();
   }
-  document.addEventListener('htmx:afterSwap', onSwapped);
+  document.addEventListener('htmx:afterSwap', function (e) {
+    // detail.elt is the swapped element here; the request's own element is in requestConfig.
+    var src = e.detail.requestConfig && e.detail.requestConfig.elt;
+    if (matches(src, 'form.cp-box') && e.detail.xhr) recordOwn(src, e.detail.xhr.responseText);
+    onSwapped();
+  });
   document.addEventListener('htmx:oobAfterSwap', onSwapped);
 
   document.addEventListener('htmx:sseMessage', function (e) {
