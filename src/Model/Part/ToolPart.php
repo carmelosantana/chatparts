@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ChatParts\Model\Part;
 
+use ChatParts\Model\Fields;
 use ChatParts\Model\ToolState;
 
 final readonly class ToolPart extends Part
@@ -38,15 +39,23 @@ final readonly class ToolPart extends Part
         ];
     }
 
-    public static function fromArray(array $a): self
+    public function jsonSerialize(): array
+    {
+        $a = $this->toArray();
+        $a['input'] = (object) $this->input;
+
+        return $a;
+    }
+
+    protected static function fromFields(array $a): static
     {
         return new self(
-            $a['id'],
-            $a['name'],
-            $a['input'] ?? [],
-            ToolState::from($a['state']),
-            $a['outputSummary'] ?? null,
-            $a['error'] ?? null,
+            Fields::string($a, 'id', 'tool part'),
+            Fields::string($a, 'name', 'tool part'),
+            Fields::array($a, 'input', 'tool part', optional: true),
+            Fields::enum($a, 'state', 'tool part', ToolState::class),
+            Fields::nullableString($a, 'outputSummary', 'tool part'),
+            Fields::nullableString($a, 'error', 'tool part'),
         );
     }
 }

@@ -7,8 +7,9 @@ namespace ChatParts\Model;
 use ChatParts\Model\Part\Part;
 use ChatParts\Model\Part\TextPart;
 use InvalidArgumentException;
+use JsonSerializable;
 
-final readonly class Message
+final readonly class Message implements JsonSerializable
 {
     /** @var list<Part> */
     public array $parts;
@@ -43,17 +44,42 @@ final readonly class Message
         ];
     }
 
-    /** @param array<string, mixed> $a */
+    /**
+     * The JSON shape: toArray() with metadata as an object, so an empty map stays `{}`.
+     *
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        $a = $this->toArray();
+        $a['parts'] = $this->parts;
+        $a['metadata'] = (object) $this->metadata;
+
+        return $a;
+    }
+
+    /**
+     * @param array<array-key, mixed> $a
+     * @throws InvalidArgumentException for a missing or mistyped key or an unknown enum value
+     */
     public static function fromArray(array $a): self
     {
+        $parts = [];
+        foreach (Fields::array($a, 'parts', 'message') as $i => $p) {
+            if (!is_array($p)) {
+                throw new InvalidArgumentException(sprintf('Malformed message: part #%s must be an array, got %s.', $i, get_debug_type($p)));
+            }
+            $parts[] = Part::fromArray($p);
+        }
+
         return new self(
-            $a['id'],
-            $a['room'],
-            Participant::fromArray($a['participant']),
-            MessageStatus::from($a['status']),
-            array_map(static fn (array $p): Part => Part::fromArray($p), $a['parts']),
-            $a['metadata'] ?? [],
-            $a['createdAt'],
+            Fields::string($a, 'id', 'message'),
+            Fields::string($a, 'room', 'message'),
+            Participant::fromArray(Fields::array($a, 'participant', 'message')),
+            Fields::enum($a, 'status', 'message', MessageStatus::class),
+            $parts,
+            Fields::array($a, 'metadata', 'message', optional: true),
+            Fields::int($a, 'createdAt', 'message'),
         );
     }
 

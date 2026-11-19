@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ChatParts\Model\Part;
 
+use ChatParts\Model\Fields;
+
 final readonly class FilePart extends Part
 {
     public function __construct(
@@ -33,8 +35,14 @@ final readonly class FilePart extends Part
         ];
     }
 
-    public static function fromArray(array $a): self
+    protected static function fromFields(array $a): static
     {
-        return new self($a['id'], $a['name'], $a['mime'], $a['url'], $a['thumbUrl'] ?? null);
+        return new self(
+            Fields::string($a, 'id', 'file part'),
+            Fields::string($a, 'name', 'file part'),
+            Fields::string($a, 'mime', 'file part'),
+            Fields::string($a, 'url', 'file part'),
+            Fields::nullableString($a, 'thumbUrl', 'file part'),
+        );
     }
 }

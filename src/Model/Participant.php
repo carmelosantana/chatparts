@@ -20,9 +20,16 @@ final readonly class Participant
         return ['kind' => $this->kind, 'id' => $this->id, 'name' => $this->name];
     }
 
-    /** @param array{kind: string, id: ?string, name: string} $a */
+    /**
+     * @param array<array-key, mixed> $a
+     * @throws \InvalidArgumentException for a missing or mistyped key
+     */
     public static function fromArray(array $a): self
     {
-        return new self($a['kind'], $a['id'] ?? null, $a['name']);
+        return new self(
+            Fields::string($a, 'kind', 'participant'),
+            Fields::nullableString($a, 'id', 'participant'),
+            Fields::string($a, 'name', 'participant'),
+        );
     }
 }

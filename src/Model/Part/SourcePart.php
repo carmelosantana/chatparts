@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ChatParts\Model\Part;
 
+use ChatParts\Model\Fields;
+
 final readonly class SourcePart extends Part
 {
     /**
@@ -40,8 +42,15 @@ final readonly class SourcePart extends Part
         ];
     }
 
-    public static function fromArray(array $a): self
+    protected static function fromFields(array $a): static
     {
-        return new self($a['id'], $a['n'], $a['title'], $a['url'], $a['kind'], $a['ref']);
+        return new self(
+            Fields::string($a, 'id', 'source part'),
+            Fields::int($a, 'n', 'source part'),
+            Fields::string($a, 'title', 'source part'),
+            Fields::string($a, 'url', 'source part'),
+            Fields::string($a, 'kind', 'source part'),
+            Fields::string($a, 'ref', 'source part'),
+        );
     }
 }

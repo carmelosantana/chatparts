@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ChatParts\Model\Part;
 
+use ChatParts\Model\Fields;
+
 /** Host-defined structured payload; $type names the payload kind (serialised as 'dataType'). */
 final readonly class DataPart extends Part
 {
@@ -23,8 +25,20 @@ final readonly class DataPart extends Part
         return ['type' => 'data', 'id' => $this->id, 'dataType' => $this->type, 'payload' => $this->payload];
     }
 
-    public static function fromArray(array $a): self
+    public function jsonSerialize(): array
     {
-        return new self($a['id'], $a['dataType'], $a['payload'] ?? []);
+        $a = $this->toArray();
+        $a['payload'] = (object) $this->payload;
+
+        return $a;
+    }
+
+    protected static function fromFields(array $a): static
+    {
+        return new self(
+            Fields::string($a, 'id', 'data part'),
+            Fields::string($a, 'dataType', 'data part'),
+            Fields::array($a, 'payload', 'data part', optional: true),
+        );
     }
 }

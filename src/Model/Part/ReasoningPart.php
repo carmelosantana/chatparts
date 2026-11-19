@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ChatParts\Model\Part;
 
+use ChatParts\Model\Fields;
+
 final readonly class ReasoningPart extends Part
 {
     public function __construct(string $id, public string $text, public ?int $durationMs)
@@ -21,8 +23,12 @@ final readonly class ReasoningPart extends Part
         return ['type' => 'reasoning', 'id' => $this->id, 'text' => $this->text, 'durationMs' => $this->durationMs];
     }
 
-    public static function fromArray(array $a): self
+    protected static function fromFields(array $a): static
     {
-        return new self($a['id'], $a['text'], $a['durationMs'] ?? null);
+        return new self(
+            Fields::string($a, 'id', 'reasoning part'),
+            Fields::string($a, 'text', 'reasoning part'),
+            Fields::nullableInt($a, 'durationMs', 'reasoning part'),
+        );
     }
 }
