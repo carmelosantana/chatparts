@@ -17,8 +17,8 @@ scripts/sync-into.sh /path/to/host-plugin
 
 This replaces `/path/to/host-plugin/vendor-chatparts/` with `src/`, `assets/`,
 `autoload.php`, `LICENSE`, `THIRD_PARTY.md` and `CHECKSUMS`. Files from an older copy are
-removed. Every copied file is checked against `CHECKSUMS`, and the script exits 1 on a
-mismatch or an extra file. It also refuses to run when `CHECKSUMS` does not match the
+removed. The copy is staged and checked against `CHECKSUMS` first, and the script exits 1
+on a mismatch or an extra file. A failed sync leaves the previous copy as it was. It also refuses to run when `CHECKSUMS` does not match the
 source tree. After you change a vendored file, run `scripts/checksums.sh` and commit
 `CHECKSUMS`.
 
@@ -112,9 +112,10 @@ The kit needs no inline script and no `eval`.
 - Serve `htmx.min.js`, `htmx-ext-sse.js`, `chatparts.js`, `chatparts.css` and `icons.svg`
   from the host's own origin through `assetUrl()`. Nothing loads from a CDN.
 - `script-src 'self'` is enough for the kit.
-- A named avatar tone (`blue`, `purple`, `teal`, `orange`) becomes a `cp-tone-*` class. A
-  hex tone (`#2271b1`) becomes a `style` attribute (`--cp-tone`). If your policy blocks
-  style attributes, return named tones from `avatarFor()`, or a hex tone falls back to grey.
+- A named avatar tone (`blue`, `green`, `orange`, `pink`, `purple`, `red`, `slate` or
+  `teal`) becomes a `cp-tone-*` class. A hex tone (`#2271b1`) becomes a `style` attribute
+  (`--cp-tone`). If your policy blocks style attributes, return named tones from
+  `avatarFor()`, or a hex tone falls back to grey.
 
 ## Theming
 
