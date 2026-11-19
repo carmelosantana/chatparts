@@ -77,6 +77,14 @@ Components live in `ChatParts\View`, extend `Component` and take the host first.
 | `Drawer` | `string $title`, `string $subtitle`, `string $body` (ready HTML) |
 | `Icon` | `string $name`, `string $class = 'cp-icon'` |
 
+`Composer` options: `room` is posted as a hidden field; `canAsk` adds the @bot hint to the
+default placeholder; without `allowImages` there is no attach control or file input; without a
+safe `contextUrl` there is no context ring. `botSeesImages` (default `true`) is the image hint:
+pass `false` when images stay with the people in the room but are not sent to the bot (the
+host turned image input off, or the provider refuses it), and the composer shows "The bot
+won't see images" under the thumbnails while there are any. The text goes through the host's
+`t()`.
+
 A `Notice` sent with status 400, 403, 409, 413, 422 or 429 is swapped into the request's
 target (htmx 2 swaps no 4xx response by default), and the composer keeps the typed text.
 
