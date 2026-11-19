@@ -67,6 +67,15 @@ final class ComposerTest extends TestCase
         $this->assertStringNotContainsString('multipart', $html);
     }
 
+    public function testBotWontSeeImagesHintFollowsTheImagesThumbs(): void
+    {
+        $html = (new Composer(new FakeHost(), '/send', ['botSeesImages' => false] + self::OPTS))->render();
+        $this->assertStringContainsString('<div id="cp-thumbs" class="cp-thumbs"></div><p class="cp-thumbs__hint">The bot won&#039;t see images</p>', $html);
+
+        $this->assertStringNotContainsString('cp-thumbs__hint', (new Composer(new FakeHost(), '/send', self::OPTS))->render(), 'by default the bot sees images');
+        $this->assertStringNotContainsString('cp-thumbs__hint', (new Composer(new FakeHost(), '/send', ['botSeesImages' => false, 'allowImages' => false] + self::OPTS))->render(), 'no images, no hint');
+    }
+
     public function testUnsafeUrlsAreDropped(): void
     {
         $html = (new Composer(new FakeHost(), 'javascript:alert(1)', ['contextUrl' => 'javascript:x', 'stopUrl' => 'data:x'] + self::OPTS))->render();

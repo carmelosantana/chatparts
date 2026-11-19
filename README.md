@@ -67,7 +67,7 @@ Components live in `ChatParts\View`, extend `Component` and take the host first.
 | `SourceList` | `array $sources` (list of `SourcePart`) |
 | `InlineCitation` | `int $n`, `?SourcePart $source` |
 | `Receipt` | `array $metadata` (the message metadata: `model`, `tool_count`, `finish_reason`, `asked_by` {`id`, `name`, `role`}, `stopped_by`) |
-| `Composer` | `string $action`, `array $opts = []` (`placeholder`, `room`, `allowImages`, `canAsk`, `contextUrl`, `stopUrl`) |
+| `Composer` | `string $action`, `array $opts = []` (`placeholder`, `room`, `allowImages`, `botSeesImages`, `canAsk`, `contextUrl`, `stopUrl`) |
 | `ContextMeter` | `array $segments` (list of `key`, `label`, `tokens`), `int $window` |
 | `MentionPicker` | `array $entries` (list of `kind`, `handle`, `name`, optional `id`) |
 | `PresenceList` | `array $groups` (keyed `people`, `agents`, `bots`) |
