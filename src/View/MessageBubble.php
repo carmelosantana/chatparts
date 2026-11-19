@@ -18,7 +18,8 @@ use ChatParts\Model\Part\ToolPart;
  * copy), the parts in their stored order, then the sources row and the receipt. All tool calls
  * share one ToolStrip, placed where the first call was; source parts are not drawn in place but
  * feed the citations and the sources row; data parts are the host's to draw. While streaming
- * the article is `aria-busy`, and the stream's final frame replaces it whole.
+ * the article is `aria-busy`, and the stream's final frame replaces it whole. `data-id` is the
+ * message id: chatparts.js reads it for the poll cursor and to drop a bubble that arrives twice.
  */
 final class MessageBubble extends Component
 {
