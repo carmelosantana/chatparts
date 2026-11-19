@@ -1,0 +1,42 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Verify CHECKSUMS is current
+        run: |
+          scripts/checksums.sh "$RUNNER_TEMP/CHECKSUMS"
+          if ! cmp -s "$RUNNER_TEMP/CHECKSUMS" CHECKSUMS; then
+            echo "::error::CHECKSUMS is out of date; run scripts/checksums.sh and commit it"
+            diff "$RUNNER_TEMP/CHECKSUMS" CHECKSUMS || true
+            exit 1
+          fi
+          sha256sum --quiet --strict -c CHECKSUMS
+
+      - name: Build the zip
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          zip -rX "chatparts-${TAG}.zip" src assets autoload.php LICENSE THIRD_PARTY.md CHECKSUMS
+
+      - name: Attach to a GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" "chatparts-${TAG}.zip" \
+            --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes --verify-tag
