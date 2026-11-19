@@ -4,15 +4,17 @@
 # Usage: scripts/checksums.sh [output-file]   (default: CHECKSUMS at the repo root)
 set -euo pipefail
 export LC_ALL=C
+unset CDPATH
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root="$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 out="${1:-$root/CHECKSUMS}"
 
-cd "$root"
+cd -- "$root"
 tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
+trap 'rm -f -- "$tmp"' EXIT
 find src assets autoload.php LICENSE THIRD_PARTY.md -type f -print0 \
   | sort -z \
   | xargs -0 sha256sum > "$tmp"
-mv "$tmp" "$out"
+chmod 644 -- "$tmp"
+mv -- "$tmp" "$out"
 trap - EXIT

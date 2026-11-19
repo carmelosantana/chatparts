@@ -38,5 +38,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" "chatparts-${TAG}.zip" \
-            --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes --verify-tag
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "chatparts-${TAG}.zip" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" "chatparts-${TAG}.zip" \
+              --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes --verify-tag
+          fi
