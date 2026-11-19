@@ -18,6 +18,9 @@ final class SseWriterTest extends TestCase
 
     private float $now = 1000.0;
 
+    /** @var list<int> status codes passed with headers (0 = left alone) */
+    private array $codes = [];
+
     private function writer(): SseWriter
     {
         return new SseWriter(
@@ -25,8 +28,9 @@ final class SseWriterTest extends TestCase
                 $this->buf .= $s;
             },
             fn (): float => $this->now,
-            function (string $h): void {
+            function (string $h, bool $replace = true, int $code = 0): void {
                 $this->headers[] = $h;
+                $this->codes[] = $code;
             },
         );
     }
@@ -105,6 +109,29 @@ final class SseWriterTest extends TestCase
         $this->assertSame("event: done\ndata: \n\n", $this->buf);
     }
 
+    public function testCloseBeforeOpenSendsHeaders(): void
+    {
+        $w = $this->writer();
+        $w->close();
+
+        $this->assertSame(
+            ['Content-Type: text/event-stream', 'Cache-Control: no-cache', 'X-Accel-Buffering: no'],
+            $this->headers,
+        );
+        $this->assertSame("event: done\ndata: \n\n", $this->buf);
+    }
+
+    public function testEventBeforeOpenSendsHeadersOnce(): void
+    {
+        $w = $this->writer();
+        $w->event(StreamEvents::DELTA, 'x');
+        $w->heartbeat();
+        $w->open();
+
+        $this->assertCount(3, $this->headers);
+        $this->assertSame([0, 0, 0], $this->codes, 'a normal stream leaves the status alone');
+    }
+
     public function testRefuseSendsOnlyDone(): void
     {
         $w = $this->writer();
@@ -115,6 +142,7 @@ final class SseWriterTest extends TestCase
             ['Content-Type: text/event-stream', 'Cache-Control: no-cache', 'X-Accel-Buffering: no'],
             $this->headers,
         );
+        $this->assertSame(200, $this->codes[0], 'refuse() sets 200 explicitly');
         $this->assertSame("event: done\ndata: \n\n", $this->buf);
     }
 

@@ -20,8 +20,10 @@ use InvalidArgumentException;
  * 2.2.4 reconnects whenever the source closes for any other reason (a 204 or a 403 included),
  * forever. Answer a spent, unknown or foreign stream id with refuse(), not an error status.
  *
- * Once closed (by close() or refuse()) the writer stays closed: later writes are no-ops, so an
- * error path can call close() without checking whether the stream already ended.
+ * The first write opens the stream if open() was not called, so even close() on an early
+ * error path answers as an event stream. Once closed (by close() or refuse()) the writer stays
+ * closed: later writes are no-ops, so an error path can call close() without checking whether
+ * the stream already started or ended.
  */
 final class SseWriter
 {
@@ -39,7 +41,8 @@ final class SseWriter
     /**
      * @param (callable(string): void)|null $out    receives each frame; defaults to echo + flush()
      * @param (callable(): float)|null      $clock  seconds; defaults to microtime(true)
-     * @param (callable(string): void)|null $header sends one response header; defaults to header()
+     * @param (callable(string, bool, int): void)|null $header sends one response header, with
+     *   header()'s replace flag and response code (0 = leave the status alone); defaults to header()
      */
     public function __construct(?callable $out = null, ?callable $clock = null, ?callable $header = null)
     {
@@ -51,7 +54,7 @@ final class SseWriter
             }
             : Closure::fromCallable($out);
         $this->clock = $clock === null ? static fn (): float => microtime(true) : Closure::fromCallable($clock);
-        $this->header = $header === null ? static fn (string $h) => header($h) : Closure::fromCallable($header);
+        $this->header = $header === null ? static fn (string $h, bool $replace = true, int $code = 0) => header($h, $replace, $code) : Closure::fromCallable($header);
         $this->lastWrite = ($this->clock)();
     }
 
@@ -61,12 +64,18 @@ final class SseWriter
      */
     public function open(): void
     {
+        $this->start(0);
+    }
+
+    /** open() with a status code on the first header (0 leaves the status alone). */
+    private function start(int $status): void
+    {
         if ($this->opened) {
             return;
         }
         $this->opened = true;
-        foreach (self::HEADERS as $h) {
-            ($this->header)($h);
+        foreach (self::HEADERS as $i => $h) {
+            ($this->header)($h, true, $i === 0 ? $status : 0);
         }
         if ($this->phpOutput) {
             @ini_set('zlib.output_compression', '0');
@@ -124,16 +133,19 @@ final class SseWriter
 
     /**
      * The whole answer for a stream id that is spent, unknown or not the caller's: a 200
-     * event stream holding only `done`, so the client closes instead of reconnecting.
+     * event stream holding only `done`, so the client closes instead of reconnecting. The 200
+     * is set explicitly (a host may have set another status earlier) unless the stream is
+     * already open, when headers are gone and only `done` is written.
      */
     public function refuse(): void
     {
-        $this->open();
+        $this->start(200);
         $this->close();
     }
 
     private function write(string $s): void
     {
+        $this->open();
         ($this->out)($s);
         $this->lastWrite = ($this->clock)();
     }
