@@ -1,8 +1,61 @@
 # Third-party components
 
-- htmx (0BSD): vendored by a later release; not bundled yet.
+- htmx 2.0.11 (0BSD): `assets/htmx.min.js` is `package/dist/htmx.min.js`, unmodified, from
+  https://registry.npmjs.org/htmx.org/-/htmx.org-2.0.11.tgz.
+- htmx-ext-sse 2.2.4 (0BSD): `assets/htmx-ext-sse.js` is `package/dist/sse.js`, unmodified, from
+  https://registry.npmjs.org/htmx-ext-sse/-/htmx-ext-sse-2.2.4.tgz.
 - Lucide icons (ISC): `assets/icons.svg` is built from Lucide 1.74.0 by
   `scripts/build-icons.ts`; the icons used and their checksums are in `scripts/icons.lock`.
+
+## htmx checksums (sha256)
+
+```text
+165a2655073e9e6e55e307a7c74e8ebcdb76afb7701f9c16cfd106a13add408e  htmx.org-2.0.11.tgz
+d6fdc75f204e6bdefa99b69bf1e6d4ac69b8a364f77929f45c13476b4000f717  assets/htmx.min.js
+90b46f5ab915ba2f64e6348448c8dba509277a47e15c125ffb65754eb4f6b5dc  htmx-ext-sse-2.2.4.tgz
+3b5992a541619babefc4c169505af474df5c3039da51e59b96ccf9241ecd61d2  assets/htmx-ext-sse.js
+```
+
+## htmx 2.0.11 licence
+
+From `package/LICENSE` in the htmx.org tarball.
+
+```text
+Zero-Clause BSD
+=============
+
+Permission to use, copy, modify, and/or distribute this software for
+any purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED “AS IS” AND THE AUTHOR DISCLAIMS ALL
+WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE
+FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
+DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+## htmx-ext-sse 2.2.4 licence
+
+From `package/LICENSE` in the htmx-ext-sse tarball.
+
+```text
+BSD Zero Clause License
+
+Copyright (c) 2023, Alexander Petros
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
 
 ## Lucide 1.74.0 licence
 
