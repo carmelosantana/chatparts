@@ -49,12 +49,23 @@ abstract class Component
      */
     protected function u(string $s): string
     {
+        $url = $this->safeUrl($s);
+
+        return $url === null ? '' : $this->a($url);
+    }
+
+    /**
+     * The same check as u(), unescaped, for a URL headed into tag() (which escapes it): the
+     * cleaned URL, or null for an empty or refused one, so tag() drops the attribute.
+     */
+    protected function safeUrl(string $s): ?string
+    {
         $s = (string) preg_replace('/[\x00-\x1F\x7F]/', '', trim($s));
-        if (preg_match('/^([a-z][a-z0-9+.-]*):/i', $s, $m) === 1 && !in_array(strtolower($m[1]), self::URL_SCHEMES, true)) {
-            return '';
+        if ($s === '' || (preg_match('/^([a-z][a-z0-9+.-]*):/i', $s, $m) === 1 && !in_array(strtolower($m[1]), self::URL_SCHEMES, true))) {
+            return null;
         }
 
-        return $this->a($s);
+        return $s;
     }
 
     /**
