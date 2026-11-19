@@ -97,6 +97,7 @@ final class IconTest extends TestCase
                 public function avatarFor(ChatParts\Model\Participant $p): array { return ['initials' => '', 'tone' => '']; }
                 public function t(string $s, mixed ...$args): string { return $s; }
                 public function assetUrl(string $file): string { return '/v/' . $file; }
+                public function viewerId(): ?string { return null; }
             };
             try {
                 echo json_encode(['ok', (string) new ChatParts\View\Icon($host, $argv[2])]);

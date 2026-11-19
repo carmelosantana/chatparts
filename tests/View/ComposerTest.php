@@ -22,7 +22,7 @@ final class ComposerTest extends TestCase
         $this->assertStringContainsString('<input type="hidden" name="room" value="3">', $html);
         $this->assertStringContainsString('name="message"', $html);
         $this->assertStringContainsString('<button type="submit" class="cp-send" data-state="ready" data-stop-url="/stop?room=3" aria-label="Send">', $html);
-        $this->assertStringContainsString('hx-get="/context?room=3" hx-trigger="input changed delay:500ms from:closest form, click once"', $html);
+        $this->assertStringContainsString('hx-get="/context?room=3" hx-trigger="input changed delay:500ms from:closest form, cp-attachments delay:500ms from:closest form, click once"', $html);
         $this->assertStringContainsString('hx-target="this" hx-swap="innerHTML" aria-controls="cp-context-pop" aria-expanded="false"><svg', $html);
         $this->assertStringContainsString('<span class="cp-sr">Context used</span></button>', $html);
         $this->assertStringContainsString('<div id="cp-context-pop" class="cp-context__pop" hidden=""></div>', $html);

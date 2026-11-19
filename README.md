@@ -50,6 +50,7 @@ passes it to every component.
 | `avatarFor(Participant $p): array` | `['initials' => string, 'tone' => string]` for an avatar. |
 | `t(string $s, mixed ...$args): string` | A translated string. Extra args are sprintf placeholders. |
 | `assetUrl(string $file): string` | The public URL of a file in `assets/`, for example `icons.svg`. |
+| `viewerId(): ?string` | The participant id of whoever the page is drawn for, or null. `Receipt` says "stopped by you" only when it equals `asked_by.id`. |
 
 ## Components
 
@@ -65,7 +66,7 @@ Components live in `ChatParts\View`, extend `Component` and take the host first.
 | `ToolStrip` | `string $messageId`, `array $tools` (list of `ToolPart`), `array $sources = []` |
 | `SourceList` | `array $sources` (list of `SourcePart`) |
 | `InlineCitation` | `int $n`, `?SourcePart $source` |
-| `Receipt` | `array $metadata` (the message metadata) |
+| `Receipt` | `array $metadata` (the message metadata: `model`, `tool_count`, `finish_reason`, `asked_by` {`id`, `name`, `role`}, `stopped_by`) |
 | `Composer` | `string $action`, `array $opts = []` (`placeholder`, `room`, `allowImages`, `canAsk`, `contextUrl`, `stopUrl`) |
 | `ContextMeter` | `array $segments` (list of `key`, `label`, `tokens`), `int $window` |
 | `MentionPicker` | `array $entries` (list of `kind`, `handle`, `name`, optional `id`) |

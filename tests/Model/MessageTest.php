@@ -169,7 +169,7 @@ final class MessageTest extends TestCase
     {
         $this->assertSame('stopped: run budget reached', FinishReason::BudgetExhausted->receiptText());
         $this->assertSame('the provider refused', FinishReason::Refusal->receiptText());
-        $this->assertSame('stopped by you', FinishReason::Stopped->receiptText());
+        $this->assertSame('stopped', FinishReason::Stopped->receiptText());
         $this->assertSame("couldn't answer", FinishReason::Error->receiptText());
         $this->assertSame('', FinishReason::Stop->receiptText());
         $this->assertSame('stopped: content filter', FinishReason::ContentFilter->receiptText());

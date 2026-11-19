@@ -121,6 +121,38 @@ final class MessageBubbleTest extends TestCase
         $this->assertSame('', (new Receipt($host, ['finish_reason' => 'stop']))->render());
     }
 
+    public function testStoppedReceiptSaysYouToTheAsker(): void
+    {
+        $meta = ['bot' => 'project-bot', 'finish_reason' => 'stopped', 'stopped_by' => 'Ada', 'asked_by' => ['id' => '7', 'name' => 'Ada', 'role' => 'Manager']];
+        $this->assertSame('<footer class="cp-receipt">stopped by you</footer>', (new Receipt(new FakeHost('7'), $meta))->render());
+    }
+
+    public function testStoppedReceiptNamesTheAskerToEveryoneElse(): void
+    {
+        $meta = ['finish_reason' => 'stopped', 'stopped_by' => 'Ada <b>&', 'asked_by' => ['id' => '7', 'name' => 'Ada <b>&']];
+        $this->assertSame('<footer class="cp-receipt">stopped by Ada &lt;b&gt;&amp;</footer>', (new Receipt(new FakeHost('8'), $meta))->render());
+        $this->assertSame('<footer class="cp-receipt">stopped by Ada &lt;b&gt;&amp;</footer>', (new Receipt(new FakeHost(), $meta))->render(), 'no viewer: never "you"');
+        $noAskerId = ['finish_reason' => 'stopped', 'stopped_by' => 'Ada', 'asked_by' => ['name' => 'Ada']];
+        $this->assertSame('<footer class="cp-receipt">stopped by Ada</footer>', (new Receipt(new FakeHost('7'), $noAskerId))->render());
+    }
+
+    public function testStoppedReceiptWithoutANameSaysStopped(): void
+    {
+        $this->assertSame('<footer class="cp-receipt">stopped</footer>', (new Receipt(new FakeHost('7'), ['finish_reason' => 'stopped', 'asked_by' => ['id' => '7', 'name' => 'Ada']]))->render());
+        $this->assertSame('<footer class="cp-receipt">stopped</footer>', (new Receipt(new FakeHost('7'), ['finish_reason' => 'stopped', 'stopped_by' => '']))->render());
+        $this->assertSame(
+            '<footer class="cp-receipt">stopped: run budget reached</footer>',
+            (new Receipt(new FakeHost('7'), ['finish_reason' => 'budget_exhausted', 'stopped_by' => 'Ada', 'asked_by' => ['id' => '7', 'name' => 'Ada']]))->render(),
+        );
+    }
+
+    public function testStoppedBubbleReceiptFollowsTheViewer(): void
+    {
+        $m = new Message('9', 'r', new Participant('bot', 'project', 'project-bot'), MessageStatus::Stopped, [], ['stopped_by' => 'Ada', 'asked_by' => ['id' => '7', 'name' => 'Ada']], 0);
+        $this->assertStringContainsString('<footer class="cp-receipt">stopped by you</footer>', (new MessageBubble(new FakeHost('7'), $m))->render());
+        $this->assertStringContainsString('<footer class="cp-receipt">stopped by Ada</footer>', (new MessageBubble(new FakeHost('8'), $m))->render());
+    }
+
     public function testNoticeLevels(): void
     {
         $host = new FakeHost();

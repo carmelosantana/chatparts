@@ -65,6 +65,12 @@ final class ExampleHost implements HostAdapter
         return '../assets/' . $file;
     }
 
+    /** The examples are drawn for Ada (participant 1). */
+    public function viewerId(): ?string
+    {
+        return '1';
+    }
+
     private function inline(string $s): string
     {
         $s = $this->escape($s);

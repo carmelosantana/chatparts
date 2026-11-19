@@ -51,4 +51,9 @@ class HostProxy implements HostAdapter
     {
         return $this->fake->assetUrl($file);
     }
+
+    public function viewerId(): ?string
+    {
+        return $this->fake->viewerId();
+    }
 }

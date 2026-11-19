@@ -10,6 +10,10 @@ use ChatParts\Model\Participant;
 /** A host with predictable output, for component tests. */
 final class FakeHost implements HostAdapter
 {
+    public function __construct(private readonly ?string $viewerId = null)
+    {
+    }
+
     public function url(string $route, array $params = []): string
     {
         return '/' . $route . ($params === [] ? '' : '?' . http_build_query($params));
@@ -43,5 +47,10 @@ final class FakeHost implements HostAdapter
     public function assetUrl(string $file): string
     {
         return '/assets/' . $file;
+    }
+
+    public function viewerId(): ?string
+    {
+        return $this->viewerId;
     }
 }

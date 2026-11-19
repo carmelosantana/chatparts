@@ -118,7 +118,8 @@ $states = [
         new TextPart('ts24', 'Checking who holds'),
     ], [], '15:03'), true),
     'Bot, ready, with reasoning, tools, citations, sources and receipt' => new MessageBubble($host, $answerAs('s20')),
-    'Bot, stopped by the asker' => new MessageBubble($host, $msg('s25', $bot, MessageStatus::Stopped, [new TextPart('ts25', 'The lease on `Assets/img/**` is held by')], [], '15:04')),
+    'Bot, stopped by the asker (the viewer)' => new MessageBubble($host, $msg('s25', $bot, MessageStatus::Stopped, [new TextPart('ts25', 'The lease on `Assets/img/**` is held by')], ['stopped_by' => 'Ada Lovelace', 'asked_by' => ['id' => '1', 'name' => 'Ada Lovelace']], '15:04')),
+    'Bot, stopped by another asker' => new MessageBubble($host, $msg('s25b', $bot, MessageStatus::Stopped, [new TextPart('ts25b', 'Three tasks mention the CDN:')], ['stopped_by' => 'Jess R.', 'asked_by' => ['id' => '2', 'name' => 'Jess R.']], '15:04')),
     'Bot, run budget reached' => new MessageBubble($host, $msg('s26', $bot, MessageStatus::Done, [
         new ToolPart('tls26', 'search_tasks', [], ToolState::Error, null, 'timed out after 10 s'),
         new TextPart('ts26', 'I could not finish the search.'),
